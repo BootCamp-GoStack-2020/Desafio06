@@ -7,6 +7,7 @@ import TransactionsRepository from '../repositories/TransactionsRepository';
 import Transaction from '../models/Transaction';
 
 import Category from '../models/Category';
+import AppError from '../errors/AppError';
 
 
 interface  Request {
@@ -22,12 +23,42 @@ class CreateTransactionService {
     title, 
     value, 
     type, 
-    category
+    category,
   }: Request ): Promise<Transaction> {
     const transactionsRepository = getCustomRepository(TransactionsRepository);
-
     const categoryRepository = getRepository(Category);
-    
+
+
+    const { total } = await transactionsRepository.getBalance();
+
+    if (type === "outcome" && total < value ){
+      throw new AppError("You do not have enough balance")
+    } 
+
+
+    let transactionCategory = await categoryRepository.findOne({
+      where: {
+        title: category,
+      }
+    });
+
+    if (!transactionCategory) {
+      transactionCategory = categoryRepository.create({
+        title: category,
+      });
+
+    await categoryRepository.save(transactionCategory);
+    };
+
+
+    const transaction = transactionsRepository.create({
+      title,
+      value,
+      type,
+      category: transactionCategory,
+    });
+
+
 
     // Verificar se a categoria já existe
 
@@ -37,11 +68,6 @@ class CreateTransactionService {
     // !Existe ? Cria Ela
 
 
-    const transaction = transactionsRepository.create({
-      title,
-      value,
-      type,
-    })
 
     await transactionsRepository.save(transaction);
 
